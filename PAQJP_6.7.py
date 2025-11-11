@@ -241,7 +241,6 @@ class StateTable:
 
 # === Algorithm 15: Zero-Line Deletion + Bit-Packing ===
 class Algo15:
-    """Same as before — omitted for brevity (copy from previous version)"""
     @staticmethod
     def _split_line(line: str) -> Tuple[str, str]:
         parts = line.lstrip().split(maxsplit=1)
@@ -308,17 +307,8 @@ class Algo15:
         return "".join(result).encode('utf-8')
 
 
-# === Algorithm 11: 4-bit Nibble Packing with Bias-Shift (like Algo14 but for 4-bit) ===
+# === Algorithm 11: 4-bit Nibble Packing with Bias-Shift ===
 class Algo11:
-    """
-    Packs bytes into 4-bit nibbles using variable-length prefix:
-      00 → 0-3  (2-bit payload)
-      01 → 4-15 (4-bit payload)
-      10 → 16-63 (6-bit payload)
-      11 → 64-255 (8-bit payload)
-    Then applies PRNG-based XOR scrambling.
-    """
-
     @staticmethod
     def _pack(b: int) -> Tuple[int, int]:
         if b < 4:
@@ -393,13 +383,6 @@ class Algo11:
 
 # === Algorithm 4: 1-Byte Combination Packing (Byte Pairing) ===
 class Algo4:
-    """
-    Combines two bytes into one using:
-      - If both < 16 → pack into 4 bits each → 1 byte
-      - Else store as two bytes
-    Uses a 1-bit flag per pair.
-    """
-
     @staticmethod
     def compress(data: bytes) -> bytes:
         if not data:
@@ -411,10 +394,10 @@ class Algo4:
             b = data[i + 1] if i + 1 < len(data) else 0
             if a < 16 and b < 16:
                 packed = (a << 4) | b
-                result.append(0x80 | packed)  # MSB=1 → packed
+                result.append(0x80 | packed)  # MSB=1 -> packed
                 i += 2
             else:
-                result.append(a)  # MSB=0 → literal
+                result.append(a)  # MSB=0 -> literal
                 i += 1
         return bytes(result)
 
@@ -764,7 +747,7 @@ class PAQJPCompressor:
         for _ in range(repeat):
             for i in range(len(transformed)):
                 fib_value = self.fibonacci[i % fib_length] % 256
-                transformed[i] ^= fib_value
+                transformed[K] ^= fib_value
         return bytes(transformed)
 
     def reverse_transform_12(self, data, repeat=100):
@@ -1050,8 +1033,16 @@ def detect_filetype(filename: str) -> Filetype:
 
 
 def main():
+    # --------------------------------------------------------------
+    #  Group / person who received the apology
+    # --------------------------------------------------------------
+    GROUP_PERSON = "Vincent Geoghegan (Housing Association for Integrated Living)"
+    # --------------------------------------------------------------
+
     print("PAQJP_6.7 Compression System (Dictionary-Free)")
     print("Created by Jurijus Pacalovas")
+    print(f"Group / Apology recipient: {GROUP_PERSON}")
+    print("-" * 60)
     print("Options:")
     print("1 - Compress file")
     print("2 - Decompress file")
@@ -1059,7 +1050,7 @@ def main():
     compressor = PAQJPCompressor()
 
     try:
-        choice = input("Enter 1 or 2: ").strip()
+        choice = input("\nEnter 1 or 2: ").strip()
         if choice not in ('1', '2'):
             print("Invalid choice.")
             return
