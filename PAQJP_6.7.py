@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 
 """
-PAQJP_6.7_fixed_02_lossless
+PAQJP_6.7_fixed_01_plus
 Dictionary-Free Lossless Compressor
 Authors: Jurijus Pacalovas, Vincent Geoghegan
-Fixed: Algorithm 11 → 100% lossless via bijective scramble (173× mod 256)
-All 256 transforms are now 100% lossless and deterministic.
+New Algorithms: 04 (byte subtract), 11 (1-byte prefix pack), 14 (rotate left), 15 (540-byte pi key)
+All transforms are lossless and deterministic.
 """
 
 import os
@@ -44,7 +44,7 @@ logging.basicConfig(
 )
 
 # === Constants ===
-PROGNAME = "PAQJP_6.7_fixed_02_lossless"
+PROGNAME = "PAQJP_6.7_fixed_01_plus"
 PI_DIGITS_FILE = "pi_digits.txt"
 PRIMES = [p for p in range(2, 256) if all(p % d != 0 for d in range(2, int(p**0.5)+1))]
 MEM = 1 << 15
@@ -185,7 +185,7 @@ def find_nearest_prime_around(n):
         offset += 1
 
 
-# === State Table ===
+# === FULL State Table (256 entries) ===
 class StateTable:
     def __init__(self):
         self.table = [
@@ -215,7 +215,7 @@ class StateTable:
             [80, 102, 0, 9], [103, 69, 10, 0], [104, 87, 9, 1], [104, 87, 9, 1],
             [106, 57, 8, 2], [106, 57, 8, 2], [62, 109, 2, 8], [62, 109, 2, 8],
             [88, 111, 1, 9], [88, 111, 1, 9], [80, 112, 0, 10], [113, 85, 11, 0],
-            [114, 87, 10, 1], [114, 87, 10, 1], [116, 57, 9, 6], [116, 57, 9, 2],
+            [114, 87, 10, 1], [114, 87, 10, 1], [116, 57, 9, 2], [116, 57, 9, 2],
             [62, 119, 2, 9], [62, 119, 2, 9], [88, 121, 1, 10], [88, 121, 1, 10],
             [90, 122, 0, 11], [123, 85, 12, 0], [124, 97, 11, 1], [124, 97, 11, 1],
             [126, 57, 10, 2], [126, 57, 10, 2], [62, 129, 2, 10], [62, 129, 2, 10],
@@ -609,42 +609,32 @@ class PAQJPCompressor:
         return bytes(transformed)
 
     # ------------------------------------------------------------------
-    # ALGORITHM 11 – FIXED – Fibonacci XOR + Reversible Scramble (173× mod 256)
+    # ALGORITHM 11 – NEW – Like Algo 13 but with 1-byte prefix (no bit-packing)
     # ------------------------------------------------------------------
-    def _scramble_11(self, b: int) -> int:
-        """Bijective scramble: multiplication by 173 mod 256 (coprime)"""
-        return (b * 173) % 256
-
-    def _descramble_11(self, b: int) -> int:
-        """Inverse: multiplication by 137 mod 256 (173⁻¹ ≡ 137 mod 256)"""
-        return (b * 137) % 256
-
-    def transform_11(self, data, repeat=100):
+    def transform_11(self, data):
         if not data:
             return b''
+        r = (len(data) % 255) + 1
         transformed = bytearray(data)
-        fib_len = len(self.fibonacci)
-        for _ in range(repeat):
+        for _ in range(r):
             for i in range(len(transformed)):
-                fib_val = self.fibonacci[i % fib_len] % 256
-                xored = transformed[i] ^ fib_val
-                transformed[i] = self._scramble_11(xored)
-        return bytes(transformed)
+                transformed[i] ^= (i % 256)
+        packed = bytes(transformed)
+        return struct.pack('B', r) + packed
 
-    def reverse_transform_11(self, data, repeat=100):
-        if not data:
+    def reverse_transform_11(self, data):
+        if len(data) < 1:
             return b''
-        transformed = bytearray(data)
-        fib_len = len(self.fibonacci)
-        for _ in range(repeat):
-            for i in range(len(transformed)):
-                descrambled = self._descramble_11(transformed[i])
-                fib_val = self.fibonacci[i % fib_len] % 256
-                transformed[i] = descrambled ^ fib_val
-        return bytes(transformed)
+        r = data[0]
+        packed = data[1:]
+        rev = bytearray(packed)
+        for _ in range(r):
+            for j in range(len(rev)):
+                rev[j] ^= (j % 256)
+        return bytes(rev)
 
     # ------------------------------------------------------------------
-    # ALGORITHM 12 (unchanged – pure Fibonacci XOR)
+    # ALGORITHM 12 (unchanged)
     # ------------------------------------------------------------------
     def transform_12(self, data, repeat=100):
         if not data:
@@ -941,10 +931,9 @@ def detect_filetype(filename: str) -> Filetype:
 # CLI
 # ----------------------------------------------------------------------
 def main():
-    print("PAQJP_6.7_fixed_02_lossless Compression System (Dictionary-Free)")
+    print("PAQJP_6.7_fixed_01_plus Compression System (Dictionary-Free)")
     print("Created by Jurijus Pacalovas and Vincent Geoghegan")
-    print("Algorithm 11 FIXED: 100% lossless via bijective scramble")
-    print("All 256 transforms are now 100% lossless")
+    print("Algorithms 04,11,14,15 added – all lossless")
     print("Options:")
     print("1 - Compress file")
     print("2 - Decompress file")
@@ -1014,10 +1003,10 @@ if __name__ == "__main__":
     d4 = compressor.reverse_transform_04(c4, repeat=1)
     assert d4 == t, "Algo04 failed!"
 
-    # Test Algo 11 (FIXED)
-    c11 = compressor.transform_11(t, repeat=1)
-    d11 = compressor.reverse_transform_11(c11, repeat=1)
-    assert d11 == t, "Algo11 FAILED — NOT LOSSLESS!"
+    # Test Algo 11 (1-byte prefix)
+    c11 = compressor.transform_11(t)
+    d11 = compressor.reverse_transform_11(c11)
+    assert d11 == t, "Algo11 failed!"
 
     # Test Algo 14
     c14 = compressor.transform_14(t, repeat=1)
@@ -1029,6 +1018,6 @@ if __name__ == "__main__":
     d15 = compressor.reverse_transform_15(c15, repeat=1)
     assert d15 == t, "Algo15 failed!"
 
-    print("All new algorithms (04,11,14,15) PASS – 100% lossless & deterministic")
+    print("All new algorithms (04,11,14,15) PASS – lossless & deterministic")
     print("Starting PAQJP Compressor CLI...")
     main()
