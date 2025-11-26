@@ -1,6 +1,6 @@
-PAQJP_6.7 Compression hybrid Software 
+Upgrade_Hybid_PAQ_by_Jurijus_Pacalovas_6.7 Compression hybrid Software 
 
-PAQJP_6.7 losslessness 
+Upgrade_Hybid_PAQ_by_Jurijus_Pacalovas_6.7 losslessness 
 Lossless 100% and without corrupted files (choose the best of 256 transformations on the 9 qubits level and extract back) done 26 Nov 2025
 
 Group:
